@@ -12,7 +12,7 @@ router.post('/', function(req, res, next ) {
     let data = JSON.stringify(messageObject);
     var log = author + ": " + message + "\n";
     res.send("Message queued.");
-    fs.writeFile('../command.json', data, (err) => {
+    fs.writeFile('./command.json', data, (err) => {
         if (err) {
             console.log(err);
             return;
@@ -24,7 +24,7 @@ router.post('/', function(req, res, next ) {
             return;
         }
     });
-  });
+});
 
 router.get('/', function(req, res, next) {
     fs.readFile('./command.json', (err, data) => {
