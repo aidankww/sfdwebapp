@@ -3,6 +3,7 @@ var router = express.Router();
 var fs = require('fs')
 
 router.post('/', function(req, res, next ) {
+    res.send("Message queued.");
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
@@ -11,7 +12,7 @@ router.post('/', function(req, res, next ) {
     };
     let data = JSON.stringify(messageObject);
     var log = author + ": " + message + "\n";
-    res.send("Message queued.");
+    
     fs.writeFile('./command.json', data, (err) => {
         if (err) {
             console.log(err);
