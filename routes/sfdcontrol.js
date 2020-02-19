@@ -1,9 +1,11 @@
 var express = require('express');
 var router = express.Router();
 var fs = require('fs')
+const signVerification = require('../signVerification.js');
+
+router.post('/', signVerification);
 
 router.post('/', function(req, res, next ) {
-    res.send("Message queued.");
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
@@ -12,6 +14,7 @@ router.post('/', function(req, res, next ) {
     };
     let data = JSON.stringify(messageObject);
     var log = author + ": " + message + "\n";
+    console.log("Got here!")
     
     fs.writeFile('./command.json', data, (err) => {
         if (err) {
@@ -19,6 +22,7 @@ router.post('/', function(req, res, next ) {
             return;
         }
     });
+    res.send("Message queued.");
     fs.appendFile('./log.txt', log, (err) => {
         if (err) {
             console.log(err);
