@@ -1,5 +1,10 @@
 var crypto = require('crypto');
 const qs = require('qs');
+
+// Verify that the incoming POST request is from Slack
+// Using the provided signing key
+
+// Signing key from Slack API should be saved as env variable
 const slackKey = process.env.SLACK_SIGNING_KEY;
 
 let signVerification = (req, res, next) => {

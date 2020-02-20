@@ -8,8 +8,7 @@ var fs = require('fs');
 const port = 80;
 
 var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var sfdRouter = require('./routes/sfdcontrol')
+var sfdRouter = require('./routes/sfdcontrol');
 
 var app = express();
 
@@ -29,7 +28,6 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
 app.use('/sfdcontrol', sfdRouter);
 
 // catch 404 and forward to error handler
