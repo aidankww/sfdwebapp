@@ -12,7 +12,6 @@ router.post('/', function(req, res, next ) {
         author: author,
         message: message
     };
-
     let data = JSON.stringify(messageObject);
 
     // Prep log tracking
@@ -28,13 +27,15 @@ router.post('/', function(req, res, next ) {
             return;
         }
     });
-    res.send("Message queued.");
     fs.appendFile('./log.txt', log, (err) => {
         if (err) {
             console.log(err);
             return;
         }
     });
+
+    res.send(`Message queued for Split Flap Display: ${message}`);
+
 });
 
 router.get('/', function(req, res, next) {
