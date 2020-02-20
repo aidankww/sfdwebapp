@@ -5,7 +5,7 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var bodyParser = require('body-parser');
 var fs = require('fs');
-const port = 3000;
+const port = 80;
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -13,7 +13,8 @@ var sfdRouter = require('./routes/sfdcontrol')
 
 var app = express();
 
-app.listen(port, () => console.log("Now listening on port 3000!"))
+app.listen(port, () => console.log(`Now listening on port ${port}!`));
+
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

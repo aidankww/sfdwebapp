@@ -12,9 +12,15 @@ router.post('/', function(req, res, next ) {
         author: author,
         message: message
     };
+
     let data = JSON.stringify(messageObject);
-    var log = author + ": " + message + "\n";
-    console.log("Got here!")
+
+    // Prep log tracking
+    let date = new Date;
+    let time = (date.getMonth() + 1) + ", " + date.getHours() + ":" + date.getMinutes() 
+            + ":" + date.getSeconds() + ', ' + date.getFullYear();
+    
+    var log = time + " | " +  author + ": " + message + "\n";
     
     fs.writeFile('./command.json', data, (err) => {
         if (err) {
