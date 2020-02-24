@@ -4,7 +4,7 @@ var path = require('path');
 var logger = require('morgan');
 var bodyParser = require('body-parser');
 var fs = require('fs');
-const port = 80;
+const port = 5000;
 
 var indexRouter = require('./routes/index');
 var sfdRouter = require('./routes/sfdcontrol');
@@ -12,7 +12,6 @@ var sfdRouter = require('./routes/sfdcontrol');
 var app = express();
 
 app.listen(port, () => console.log(`Now listening on port ${port}!`));
-
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
