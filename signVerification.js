@@ -18,15 +18,14 @@ let signVerification = (req, res, next) => {
                 .update(basestring, 'utf8')
                 .digest('hex');
         var slackSignature = req.headers['x-slack-signature'];
-
         if (crypto.timingSafeEqual(
             Buffer.from(serverSignature, 'utf8'),
             Buffer.from(slackSignature, 'utf8'))
         )   {
-
             next();
 
         } else {
+            console.log("rip");
             return res.status(400).send('Failed Verification');
         }
 
