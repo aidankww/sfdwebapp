@@ -5,6 +5,7 @@ const serialport = require('serialport');
 const signVerification = require('../signVerification.js');
 const http = require('http');
 const Gpio = require('onoff').Gpio;
+// const priv = require('./privileged.json')
 
 const serialToggle = new Gpio(4, 'out');
 serialToggle.writeSync(1);
@@ -12,7 +13,6 @@ serialToggle.writeSync(1);
 const port = new serialport('/dev/serial0', {
     baudRate:9600
 });
-
 
 pos = new Object();
 pos = {
@@ -25,16 +25,20 @@ pos = {
     '-':48, '%':49, '*':50, '#':51, '=':52
 };
 
+
 router.post('/', signVerification);
 
-router.post('/', function(req, res, next ) {
+let messageQueue = [];
+
+router.post('/', (req, res, next ) => {
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
         author: author,
-        message: message
+        message: message,
+        body: req.body,
+        time: Date.now(),
     };
-    let data = JSON.stringify(messageObject);
 
     // Prep log tracking
     let date = new Date;
@@ -43,81 +47,116 @@ router.post('/', function(req, res, next ) {
     
     var log = time + " | " +  author + ": " + message + "\n";
     
-    
     fs.appendFile('./log.txt', log, (err) => {
         if (err) {
             console.log(err);
             return;
         }
     });
-    next();
+
+    res.send(`Message "${message}" queued for Split Flap Display!`);
+    res.end();
+
+    messageQueue.push(messageObject);
+    
 });
 
-router.post('/', (req, res, next) => {
-    message = req.body.text;
-    res.send(`Message queued for Split Flap Display: \"${message}\"`);
+const queueMessages = () => {
+    return new Promise((resolve, reject) => {
+        if (messageQueue.length === 0) {
+            resolve(true);
+            getSavings();
+        } else if (messageQueue.length > 0) {
+            prepMessage();
+            resolve(false);
+        } else {
+            reject("error in reading messageQueue");
+        }
+    });
+    
+}
+
+const prepMessage = () => {
+    console.log('epic');
+    const messageObject = messageQueue[0];
+    // let now = Date.now();
+    // let cooldown = now + (messageObject.time * 1000);
+    // if (cooldown < now) {
+    //     queueMessages()
+    //             .then(resolve => {
+    //                 if (resolve) {
+    //                     getSavings();
+    //                 }
+    //             });
+    // }
+
+    let message = messageObject.body.text;
+    messageQueue = messageQueue.shift();
+    translate(message);
+};
+
+const sendSerial = (message) => {
+    console.log("Serial about to be sent");
+    return new Promise((resolve, reject) => {
+        port.write(message, (err) => {
+            if (err) {
+                reject(err);
+            }
+        });
+        resolve();
+    });
+    
+}
+
+const getSavings = () => {
+    console.log("savings");
+    let result = '';
+    const options = {
+        host:'dev.waiteswireless.com',
+        port:80,
+        path:'/amount_simple.php',
+        method:'GET'
+    }
+
+    const req = http.request(options, (res) => {
+        console.log(`statusCode: ${res.statusCode}`);
+        let amount = '';
+        res.on('data', (d) => {
+            amount += d;
+        });
+
+        res.on('end', () => {
+            result = JSON.parse(amount);
+            console.log("Inside: " + result);
+            translate(result);
+        });
+        
+    });
+
+    req.on("error", (err) => {
+        console.log("Error: " + err.message);
+    });
+
+    req.end();
+}
+
+const translate = (message) => {
+    message = message.toString();
     while (message.length < 15) {
         message = message.concat('=');
     }
-    console.log(message);
+
     slicedMessage = message.slice(0, 15).toLowerCase();
     posConvertedMessage = '';
     for (i = 0; i < slicedMessage.length; i++) {
         posConvertedMessage = posConvertedMessage.concat(pos[slicedMessage[i]]);
     }
     posConvertedMessage = posConvertedMessage.concat('>');
-    console.log("Pos Converted Message: " + posConvertedMessage);
-    
-    res.end();
-    
-    sendSerial(posConvertedMessage, res);
-    //getSavings();
-});
 
-let sendSerial = (message, res) => {
-    console.log("Serial about to be sent");
-    port.write(message, (err) => {
-        if (err) {
-            return console.log("error on write (sendSerial)");
-        }
-        console.log("Serial Sent");
-        return;
-    });
+    sendSerial(posConvertedMessage)
+            .catch(rej => console.log(rej));
     
-}
-
-let getSavings = () => {
-    console.log("savings");
-    const options = {
-        host:'dev.waiteswireless.com',
-        port:5000,
-        path:'/amount_simple.php',
-        method:'GET'
-    }
-    request();
-    const request = http.request(options, (res) => {
-        let amount = '';
-        console.log(res);
-        res.on('data', (d) => {
-            if (err) {
-                amount += d;
-                console.log("P");
-            };
-        });
-        
-        res.on('end', () => {
-            port.write(amount, (err) => {
-                if (err) {
-                    return console.log("error on write");
-                }
-            });
-        });
-        console.log(amount)
-    }).on("error", (err) => {
-        console.log("Error: " + err.message);
-    });
-    
-    
+    setTimeout(queueMessages, 10000); // Change to 60000
 }
 
 router.get('/', function(req, res, next) {
@@ -128,5 +167,8 @@ router.get('/', function(req, res, next) {
         console.log("[SFD] GET request received!");
     });
 });
+
+queueMessages()
+        .catch(rej => console.log(rej));
 
 module.exports = router;
