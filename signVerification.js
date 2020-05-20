@@ -25,7 +25,7 @@ let signVerification = (req, res, next) => {
             next();
 
         } else {
-            console.log("rip");
+            console.log("[Crypto] Incoming Message's Verification Failed");
             return res.status(400).send('Failed Verification');
         }
 
