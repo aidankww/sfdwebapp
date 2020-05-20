@@ -1,11 +1,15 @@
+/*
+    TODO:
+        if the current message is 
+*/
+
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
 const serialport = require('serialport');
 const signVerification = require('../signVerification.js');
-const http = require('http');
+const http = require('https');
 const Gpio = require('onoff').Gpio;
-// const priv = require('./privileged.json')
 
 const serialToggle = new Gpio(4, 'out');
 serialToggle.writeSync(1);
@@ -13,6 +17,8 @@ serialToggle.writeSync(1);
 const port = new serialport('/dev/serial0', {
     baudRate:9600
 });
+
+const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman'];
 
 pos = new Object();
 pos = {
@@ -25,20 +31,39 @@ pos = {
     '-':48, '%':49, '*':50, '#':51, '=':52
 };
 
-
 router.post('/', signVerification);
 
 let messageQueue = [];
+let previousMessage = '';
+let currentMessage = '';
 
 router.post('/', (req, res, next ) => {
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
         author: author,
-        message: message,
+        message: toString(message),
         body: req.body,
-        time: Date.now(),
+        time: 60,
     };
+
+    let codeArray = message.split(' ');
+
+    // Message time override (only works if user has permission)
+    try {
+        codeArray.forEach((element, index) => {
+            if (element === "`robbotomy") {
+                privilegedUsers.forEach(user => {
+                    if (user === messageObject.author) {
+                        console.log(`Time override by ${messageObject.author}`);
+                        messageObject.time = parseInt(codeArray[index+1], 10);
+                    }
+                });
+            }
+        });
+    } catch (err) {
+        console.log(err);
+    }
 
     // Prep log tracking
     let date = new Date;
@@ -54,8 +79,7 @@ router.post('/', (req, res, next ) => {
         }
     });
 
-    res.send(`Message "${message}" queued for Split Flap Display!`);
-    res.end();
+    res.send(`Message "${message}" queued for Split Flap Display! It will display in ${messageQueue.length} minutes.`);
 
     messageQueue.push(messageObject);
     
@@ -63,22 +87,27 @@ router.post('/', (req, res, next ) => {
 
 const queueMessages = () => {
     return new Promise((resolve, reject) => {
-        if (messageQueue.length === 0) {
+        // Checks if there is actually a message in the queue. If there isn't, it will grab the savings from the web
+        if (messageQueue.length === 0 || !messageQueue.length) {
             resolve(true);
             getSavings();
+        // When there is a message, the message will be translated into "motor language" for the microcontrollers.
         } else if (messageQueue.length > 0) {
             prepMessage();
-            resolve(false);
+            resolve(true);
         } else {
-            reject("error in reading messageQueue");
+            reject("Error reading messageQueue");
         }
     });
     
 }
 
+// Extracts necessary information from first message in queue and sends
 const prepMessage = () => {
-    console.log('epic');
-    const messageObject = messageQueue[0];
+    console.log('Message in queue, processing...');
+    console.log('Before: ' + messageQueue.length);
+    currentMessage = messageQueue.shift();
+
     // let now = Date.now();
     // let cooldown = now + (messageObject.time * 1000);
     // if (cooldown < now) {
@@ -90,11 +119,14 @@ const prepMessage = () => {
     //             });
     // }
 
-    let message = messageObject.body.text;
-    messageQueue = messageQueue.shift();
-    translate(message);
+    let message = currentMessage.body.text;
+    console.log("After: "+ currentMessage.length)
+    let convertedMessage = translate(message);
+    sendSerial(convertedMessage)
+            .catch(rej => console.log(rej));
 };
 
+// Sends a serial message via RPi GPIO. [ADD ASSIGNED PORTS HERE]
 const sendSerial = (message) => {
     console.log("Serial about to be sent");
     return new Promise((resolve, reject) => {
@@ -103,46 +135,58 @@ const sendSerial = (message) => {
                 reject(err);
             }
         });
+        console.log(`Serial message "${message}" sent!`)
         resolve();
     });
     
 }
 
+// Grabs the company's reported client savings 
 const getSavings = () => {
-    console.log("savings");
-    let result = '';
-    const options = {
-        host:'dev.waiteswireless.com',
-        port:80,
-        path:'/amount_simple.php',
-        method:'GET'
-    }
+    let httpPromise = new Promise((resolve, reject) => {
+        console.log("Retrieving savings...");
+        let result = '';
+        const options = {
+            host:'dev.waiteswireless.com',
+            port:443,
+            path:'/amount_simple.php',
+            method:'GET'
+        }
 
-    const req = http.request(options, (res) => {
-        console.log(`statusCode: ${res.statusCode}`);
-        let amount = '';
-        res.on('data', (d) => {
-            amount += d;
-        });
+        const req = http.request(options, (res) => {
+            console.log(`statusCode: ${res.statusCode}`);
+            let amount = '';
+            res.on('data', (d) => {
+                amount += d;
+            });
 
-        res.on('end', () => {
-            result = JSON.parse(amount);
-            console.log("Inside: " + result);
-            translate(result);
-        });
+            res.on('end', () => {
+                result = JSON.parse(amount);
+                console.log("Inside: " + result);
+                let translatedMessage = translate(result);
+                sendSerial(translatedMessage)
+                        .catch(rej => console.log(rej));
+                resolve(true);
+            });
         
+        });
+
+        req.on("error", (err) => {
+            reject(err.message);
+        });
+
+        req.end();
     });
 
-    req.on("error", (err) => {
-        console.log("Error: " + err.message);
-    });
-
-    req.end();
+    httpPromise.catch(error => console.error(error));
+    
 }
 
+// Translates message to "motor language" and returns it as a string
 const translate = (message) => {
+    console.log("I am translating...")
     message = message.toString();
-    while (message.length < 15) {
+    while (message.length < 15) { // This may no longer be necessary. I'll have to test when I get back to the office.
         message = message.concat('=');
     }
 
@@ -153,20 +197,29 @@ const translate = (message) => {
     }
     posConvertedMessage = posConvertedMessage.concat('>');
 
-    sendSerial(posConvertedMessage)
-            .catch(rej => console.log(rej));
-    
-    setTimeout(queueMessages, 10000); // Change to 60000
-}
+    if (previousMessage === message) return; // Potential bug (logic error)
 
-router.get('/', function(req, res, next) {
-    fs.readFile('./command.json', (err, data) => {
-        if (err) throw err;
-        let message = JSON.parse(data);
-        res.json(message);
-        console.log("[SFD] GET request received!");
-    });
-});
+    previousMessage = message;
+    if (currentMessage) {
+        previousMessage = currentMessage;
+        console.log("Time until next message: " + currentMessage.time + " seconds");
+        setTimeout(() => {
+            queueMessages()
+                    .catch(rej => console.log(rej));
+        }, currentMessage.time * 1000);
+        currentMessage = '';
+    }
+    else 
+    {
+        setTimeout(() => {
+            queueMessages()
+                    .catch(rej => console.log(rej));
+        }, 10000); // Change to 60000
+    }
+
+    return(posConvertedMessage);
+    
+}
 
 queueMessages()
         .catch(rej => console.log(rej));
