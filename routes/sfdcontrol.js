@@ -31,6 +31,8 @@ router.post('/', signVerification);
 let messageQueue = [];
 let previousMessage = '';
 let currentMessage = '';
+
+// Used to determine whether a curre
 let currentSavings = false;
 
 router.post('/', (req, res, next ) => {
@@ -45,13 +47,14 @@ router.post('/', (req, res, next ) => {
 
     let codeArray = message.split(' ');
 
-    // Message time override (only works if user has permission)
+    // Message time override (only works if user has permission) TODO: This could probably use some optimization
     try {
         codeArray.forEach((element, index) => {
-            if (element === "`robbotomy") {
+            if (element === "`override") {
                 privilegedUsers.forEach(user => {
                     if (user === messageObject.author) {
                         console.log(`Time override by ${messageObject.author}`);
+                        messageObject.body.text = codeArray[0];
                         messageObject.time = parseInt(codeArray[index+1], 10);
                     }
                 });
@@ -63,8 +66,7 @@ router.post('/', (req, res, next ) => {
 
     // Prep log tracking
     let date = new Date;
-    let time = (date.getMonth() + 1) + ", " + date.getHours() + ":" + date.getMinutes() 
-            + ":" + date.getSeconds() + ', ' + date.getFullYear();
+    let time = `${date.getMonth()}/${date.getDate()}/${date.getFullYear()}, ` + `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
     
     var log = time + " | " +  author + ": " + message + "\n";
     
@@ -80,7 +82,8 @@ router.post('/', (req, res, next ) => {
     messageQueue.push(messageObject);
     
     if (currentSavings) {
-        queueMessages();
+        queueMessages()
+                .catch(rej => console.error(rej));
     }
     // As we're using a provided message, we tell the system that we are not using a savings value
     currentSavings = false;
@@ -90,7 +93,7 @@ router.post('/', (req, res, next ) => {
 const queueMessages = () => {
     return new Promise((resolve, reject) => {
         // Checks if there is actually a message in the queue. If there isn't, it will grab the savings from the web
-        if (!currentMessage || !messageQueue.length) {
+        if (!currentSavings && !messageQueue.length) {
             resolve(true);
             getSavings();
         // When there is a message, the message will be translated into "motor language" for the microcontrollers.
@@ -198,8 +201,7 @@ const translate = (message) => {
         }, currentMessage.time * 1000);
         currentMessage = '';
     }
-    else 
-    {
+    else {
         console.error("No time found")
     }
 
