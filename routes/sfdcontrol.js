@@ -1,8 +1,3 @@
-/*
-    TODO:
-        if the current message is 
-*/
-
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
@@ -223,5 +218,11 @@ const translate = (message) => {
 
 queueMessages()
         .catch(rej => console.log(rej));
+
+router.get('/', (req, res) => {
+    // let queueString = JSON.stringify(messageQueue);
+    // console.log(queueString)
+    res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
+})
 
 module.exports = router;

@@ -1,0 +1,18 @@
+extends layout
+
+block content
+ h1= title
+ -var messages = table
+ div
+   table
+    thead
+      tr
+       th Author
+       th Messages
+       th Time on Screen (s)
+    tbody
+      each message in messages
+        tr
+          td=message.author
+          td=message.body.text
+          td=message.time
