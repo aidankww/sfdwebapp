@@ -31,6 +31,7 @@ router.post('/', signVerification);
 let messageQueue = [];
 let previousMessage = '';
 let currentMessage = '';
+let currentSavings = false;
 
 router.post('/', (req, res, next ) => {
     var message = req.body.text;
@@ -78,12 +79,18 @@ router.post('/', (req, res, next ) => {
 
     messageQueue.push(messageObject);
     
+    if (currentSavings) {
+        queueMessages();
+    }
+    // As we're using a provided message, we tell the system that we are not using a savings value
+    currentSavings = false;
+    
 });
 
 const queueMessages = () => {
     return new Promise((resolve, reject) => {
         // Checks if there is actually a message in the queue. If there isn't, it will grab the savings from the web
-        if (messageQueue.length === 0 || !messageQueue.length) {
+        if (!currentMessage || !messageQueue.length) {
             resolve(true);
             getSavings();
         // When there is a message, the message will be translated into "motor language" for the microcontrollers.
@@ -94,7 +101,6 @@ const queueMessages = () => {
             reject("Error reading messageQueue");
         }
     });
-    
 }
 
 // Extracts necessary information from first message in queue and sends
@@ -102,17 +108,6 @@ const prepMessage = () => {
     console.log('Message in queue, processing...');
     console.log('Before: ' + messageQueue.length);
     currentMessage = messageQueue.shift();
-
-    // let now = Date.now();
-    // let cooldown = now + (messageObject.time * 1000);
-    // if (cooldown < now) {
-    //     queueMessages()
-    //             .then(resolve => {
-    //                 if (resolve) {
-    //                     getSavings();
-    //                 }
-    //             });
-    // }
 
     let message = currentMessage.body.text;
     console.log("After: "+ currentMessage.length)
@@ -123,7 +118,6 @@ const prepMessage = () => {
 
 // Sends a serial message via RPi GPIO. [ADD ASSIGNED PORTS HERE]
 const sendSerial = (message) => {
-    console.log("Serial about to be sent");
     return new Promise((resolve, reject) => {
         port.write(message, (err) => {
             if (err) {
@@ -149,7 +143,7 @@ const getSavings = () => {
         }
 
         const req = http.request(options, (res) => {
-            console.log(`statusCode: ${res.statusCode}`);
+            console.log(`[SAVINGS] statusCode: ${res.statusCode}`);
             let amount = '';
             res.on('data', (d) => {
                 amount += d;
@@ -157,7 +151,7 @@ const getSavings = () => {
 
             res.on('end', () => {
                 result = JSON.parse(amount);
-                console.log("Inside: " + result);
+                currentSavings = true;
                 let translatedMessage = translate(result);
                 sendSerial(translatedMessage)
                         .catch(rej => console.log(rej));
@@ -179,7 +173,7 @@ const getSavings = () => {
 
 // Translates message to "motor language" and returns it as a string
 const translate = (message) => {
-    console.log("I am translating...")
+    console.log("I am translating...");
     message = message.toString();
     while (message.length < 15) { // This may no longer be necessary. I'll have to test when I get back to the office.
         message = message.concat('=');
@@ -206,10 +200,7 @@ const translate = (message) => {
     }
     else 
     {
-        setTimeout(() => {
-            queueMessages()
-                    .catch(rej => console.log(rej));
-        }, 10000); // Change to 60000
+        console.error("No time found")
     }
 
     return(posConvertedMessage);
@@ -220,9 +211,7 @@ queueMessages()
         .catch(rej => console.log(rej));
 
 router.get('/', (req, res) => {
-    // let queueString = JSON.stringify(messageQueue);
-    // console.log(queueString)
     res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
-})
+});
 
 module.exports = router;
