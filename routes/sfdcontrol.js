@@ -31,9 +31,10 @@ router.post('/', signVerification);
 let messageQueue = [];
 let previousMessage = '';
 let currentMessage = '';
+let currentSavingsAmount = '';
 
-// Used to determine whether a curre
-let currentSavings = false;
+// Used to determine whether the current message is savings
+let currentSavings = true;
 
 router.post('/', (req, res, next ) => {
     var message = req.body.text;
@@ -51,18 +52,35 @@ router.post('/', (req, res, next ) => {
     try {
         codeArray.forEach((element, index) => {
             if (element === "`override") {
+                let isAdmin = false;
                 privilegedUsers.forEach(user => {
                     if (user === messageObject.author) {
                         console.log(`Time override by ${messageObject.author}`);
-                        messageObject.body.text = codeArray[0];
+                        let messageResult = "";
+                        for (var i = 0; i < index; i++) {
+                            messageResult += codeArray[i];
+                            messageResult += ' ';
+                        }
+                        messageObject.body.text = messageResult;
+                        message = messageResult;
                         messageObject.time = parseInt(codeArray[index+1], 10);
+                        isAdmin = true;
                     }
                 });
+                if (!isAdmin) {
+                    res.send("You do not have permission to override the lengths of messages");
+                    return;
+                }
             }
         });
     } catch (err) {
         console.log(err);
     }
+
+    // We only have a max of 15 boxes
+    // if (message.length() > 15) {
+    //     res.send('Cannot have more than 15 characters' || 400);
+    // }
 
     // Prep log tracking
     let date = new Date;
@@ -100,6 +118,8 @@ const queueMessages = () => {
         } else if (messageQueue.length > 0) {
             prepMessage();
             resolve(true);
+        } else if (currentSavings) {
+            resolve(false);
         } else {
             reject("Error reading messageQueue");
         }
@@ -109,7 +129,6 @@ const queueMessages = () => {
 // Extracts necessary information from first message in queue and sends
 const prepMessage = () => {
     console.log('Message in queue, processing...');
-    console.log('Before: ' + messageQueue.length);
     currentMessage = messageQueue.shift();
 
     let message = currentMessage.body.text;
@@ -126,8 +145,13 @@ const sendSerial = (message) => {
             if (err) {
                 reject(err);
             }
+            else
+            {
+                console.log(`Serial message "${message}" sent!`)
+                resolve();
+            }
         });
-        console.log(`Serial message "${message}" sent!`)
+        
         resolve();
     });
     
@@ -153,12 +177,22 @@ const getSavings = () => {
             });
 
             res.on('end', () => {
-                result = JSON.parse(amount);
-                currentSavings = true;
-                let translatedMessage = translate(result);
-                sendSerial(translatedMessage)
-                        .catch(rej => console.log(rej));
-                resolve(true);
+                result = `$${JSON.parse(amount)}`;
+                if (result != currentSavingsAmount || !currentSavings) {
+                    currentSavingsAmount = result;
+                    postCurrentSavings();
+                    setTimeout(() => {
+                        getSavings()
+                    }, 60);
+                    resolve(true);
+                } else if (currentSavings) {
+                    setTimeout(() => {
+                        queueMessages()
+                                .catch(rej => console.log(rej));
+                    }, 60);
+                    resolve(false);
+                }
+                
             });
         
         });
@@ -172,6 +206,15 @@ const getSavings = () => {
 
     httpPromise.catch(error => console.error(error));
     
+}
+
+const postCurrentSavings = () => {
+    if (messageQueue.length == 0) {
+        currentSavings = true;
+        let translatedMessage = translate(currentSavingsAmount); // Could be optimized storing the translated message
+        sendSerial(translatedMessage)
+            .catch(rej => console.log(rej));
+    }
 }
 
 // Translates message to "motor language" and returns it as a string
@@ -208,6 +251,8 @@ const translate = (message) => {
     return(posConvertedMessage);
     
 }
+
+getSavings();
 
 queueMessages()
         .catch(rej => console.log(rej));
