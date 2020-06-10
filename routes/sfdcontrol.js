@@ -32,11 +32,14 @@ let messageQueue = [];
 let previousMessage = '';
 let currentMessage = '';
 let currentSavingsAmount = '';
+let timeouts = [];
 
 // Used to determine whether the current message is savings
 let currentSavings = true;
 
 router.post('/', (req, res, next ) => {
+
+    // TODO: If the current message is the same as the previous, don't send a serial message
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
@@ -111,19 +114,26 @@ router.post('/', (req, res, next ) => {
 const queueMessages = () => {
     return new Promise((resolve, reject) => {
         // Checks if there is actually a message in the queue. If there isn't, it will grab the savings from the web
-        if (!currentSavings && !messageQueue.length) {
-            resolve(true);
+        if (!messageQueue.length) { // Needs fixed
+            resolve();
             getSavings();
         // When there is a message, the message will be translated into "motor language" for the microcontrollers.
         } else if (messageQueue.length > 0) {
             prepMessage();
-            resolve(true);
+            timeouts.forEach((object) => {
+                clearTimeout(object);
+            })
+            resolve();
         } else if (currentSavings) {
-            resolve(false);
+            timeouts.push(setTimeout(() => {
+                queueMessages()
+                        .catch((err) => console.error(err));
+            }, 60000));
+            resolve();
         } else {
             reject("Error reading messageQueue");
         }
-    });
+    }); 
 }
 
 // Extracts necessary information from first message in queue and sends
@@ -132,7 +142,6 @@ const prepMessage = () => {
     currentMessage = messageQueue.shift();
 
     let message = currentMessage.body.text;
-    console.log("After: "+ currentMessage.length)
     let convertedMessage = translate(message);
     sendSerial(convertedMessage)
             .catch(rej => console.log(rej));
@@ -181,16 +190,16 @@ const getSavings = () => {
                 if (result != currentSavingsAmount || !currentSavings) {
                     currentSavingsAmount = result;
                     postCurrentSavings();
-                    setTimeout(() => {
+                    timeouts.push(setTimeout(() => {
                         getSavings()
-                    }, 60);
-                    resolve(true);
+                    }, 60000));
+                    resolve();
                 } else if (currentSavings) {
-                    setTimeout(() => {
+                    timeouts.push(setTimeout(() => {
                         queueMessages()
-                                .catch(rej => console.log(rej));
-                    }, 60);
-                    resolve(false);
+                                .catch(rej => console.error(rej));
+                    }, 60000));
+                    resolve();
                 }
                 
             });
@@ -219,7 +228,6 @@ const postCurrentSavings = () => {
 
 // Translates message to "motor language" and returns it as a string
 const translate = (message) => {
-    console.log("I am translating...");
     message = message.toString();
     while (message.length < 15) { // This may no longer be necessary. I'll have to test when I get back to the office.
         message = message.concat('=');
@@ -245,7 +253,7 @@ const translate = (message) => {
         currentMessage = '';
     }
     else {
-        console.error("No time found")
+        console.error("No time found/is savings")
     }
 
     return(posConvertedMessage);
@@ -253,9 +261,6 @@ const translate = (message) => {
 }
 
 getSavings();
-
-queueMessages()
-        .catch(rej => console.log(rej));
 
 router.get('/', (req, res) => {
     res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
