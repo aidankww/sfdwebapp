@@ -1,3 +1,6 @@
+// TODO: If the current message is the same as the previous, don't send a serial message (Don't do until development is complete)
+// TODO: Bugfix - after a while, savings will run and make any orders useless. Gets stuck on that number, needs program restart
+
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
@@ -39,7 +42,6 @@ let currentSavings = true;
 
 router.post('/', (req, res, next ) => {
 
-    // TODO: If the current message is the same as the previous, don't send a serial message
     var message = req.body.text;
     var author = req.body.user_name;
     let messageObject = {
@@ -98,7 +100,7 @@ router.post('/', (req, res, next ) => {
         }
     });
 
-    res.send(`Message "${message}" queued for Split Flap Display! It will display in ${messageQueue.length} minutes.`);
+    res.send(`Message "${message}" queued for the Split Flap Display! It will display in ${messageQueue.length} minute(s).`);
 
     messageQueue.push(messageObject);
     
@@ -122,7 +124,7 @@ const queueMessages = () => {
             prepMessage();
             timeouts.forEach((object) => {
                 clearTimeout(object);
-            })
+            });
             resolve();
         } else if (currentSavings) {
             timeouts.push(setTimeout(() => {
@@ -140,7 +142,6 @@ const queueMessages = () => {
 const prepMessage = () => {
     console.log('Message in queue, processing...');
     currentMessage = messageQueue.shift();
-
     let message = currentMessage.body.text;
     let convertedMessage = translate(message);
     sendSerial(convertedMessage)
@@ -201,9 +202,7 @@ const getSavings = () => {
                     }, 60000));
                     resolve();
                 }
-                
             });
-        
         });
 
         req.on("error", (err) => {
@@ -251,8 +250,7 @@ const translate = (message) => {
                     .catch(rej => console.log(rej));
         }, currentMessage.time * 1000);
         currentMessage = '';
-    }
-    else {
+    } else {
         console.error("No time found/is savings")
     }
 
@@ -260,7 +258,16 @@ const translate = (message) => {
     
 }
 
-getSavings();
+let start = () => {
+    let test = translate(" 0000000000");
+    sendSerial(test);
+}
+
+start();
+// setTimeout(() => {
+//     currentSavings = false;
+//     getSavings();
+// }, 10000);
 
 router.get('/', (req, res) => {
     res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
