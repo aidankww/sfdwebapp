@@ -238,7 +238,7 @@ const translate = (message) => {
     for (i = 0; i < slicedMessage.length; i++) {
         posConvertedMessage = posConvertedMessage.concat(pos[slicedMessage[i]]);
     }
-    posConvertedMessage = posConvertedMessage.concat('>');
+    posConvertedMessage = posConvertedMessage.concat('z');
 
     if (previousMessage === message) return; // Potential bug (logic error)
 

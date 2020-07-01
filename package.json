@@ -14,7 +14,7 @@
     "http-errors": "^1.7.3",
     "jade": "~1.11.0",
     "morgan": "^1.10.0",
-    "onoff": "^5.0.1",
+    "onoff": "^6.0.0",
     "raspi": "^6.0.1",
     "request": "^2.88.2",
     "serialport": "^9.0.0"
