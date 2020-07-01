@@ -30,7 +30,8 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/app.js"
+            "program": "${workspaceFolder}/app.js",
+            "runtimeVersion": "14.4.0",
         },
     ]
 }

@@ -26,7 +26,7 @@ pos = {
     'x':24, 'y':25, 'z':26, '0':27, '1':28, '2':29, '3':30, '4':31, 
     '5':32, '6':33, '7':34, '8':35, '9':36, ',':37, '.':38, '!':39, 
     '?':40, ':':41, '/':42, "'":43, '@':44, '$':45, '&':46, '+':47, 
-    '-':48, '%':49, '*':50, '#':51, '=':52
+    '-':48, '%':49, '*':50, '#':51, '=':52, '_': 52
 };
 
 router.post('/', signVerification);
@@ -36,6 +36,7 @@ let previousMessage = '';
 let currentMessage = '';
 let currentSavingsAmount = '';
 let timeouts = [];
+let timedMessageQueue = [];
 
 // Used to determine whether the current message is savings
 let currentSavings = true;
@@ -46,9 +47,8 @@ router.post('/', (req, res, next ) => {
     var author = req.body.user_name;
     let messageObject = {
         author: author,
-        message: toString(message),
-        body: req.body,
-        time: 60,
+        message: message,
+        time: 60
     };
 
     let codeArray = message.split(' ');
@@ -66,7 +66,7 @@ router.post('/', (req, res, next ) => {
                             messageResult += codeArray[i];
                             messageResult += ' ';
                         }
-                        messageObject.body.text = messageResult;
+                        messageObject.message= messageResult;
                         message = messageResult;
                         messageObject.time = parseInt(codeArray[index+1], 10);
                         isAdmin = true;
@@ -89,7 +89,7 @@ router.post('/', (req, res, next ) => {
 
     // Prep log tracking
     let date = new Date;
-    let time = `${date.getMonth()}/${date.getDate()}/${date.getFullYear()}, ` + `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+    let time = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ` + `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
     
     var log = time + " | " +  author + ": " + message + "\n";
     
@@ -142,7 +142,8 @@ const queueMessages = () => {
 const prepMessage = () => {
     console.log('Message in queue, processing...');
     currentMessage = messageQueue.shift();
-    let message = currentMessage.body.text;
+    console.log(currentMessage.message);
+    let message = currentMessage.message;
     let convertedMessage = translate(message);
     sendSerial(convertedMessage)
             .catch(rej => console.log(rej));
@@ -237,7 +238,7 @@ const translate = (message) => {
     for (i = 0; i < slicedMessage.length; i++) {
         posConvertedMessage = posConvertedMessage.concat(pos[slicedMessage[i]]);
     }
-    posConvertedMessage = posConvertedMessage.concat('>');
+    posConvertedMessage = posConvertedMessage.concat('z');
 
     if (previousMessage === message) return; // Potential bug (logic error)
 
@@ -258,16 +259,47 @@ const translate = (message) => {
     
 }
 
-let start = () => {
+const start = () => {
     let test = translate(" 0000000000");
     sendSerial(test);
+    // fs.writeFile('./timedqueue.json', JSON.stringify('{}'), (err) => {if (err) throw err});
+    timedQueue();
+}
+
+const isEmpty = (obj) => {
+    for(var key in obj) {
+        if(obj.hasOwnProperty(key))
+            return false;
+    }
+    return true;
+}
+
+const placeIntoQueue = (message) => {
+    messageQueue.unshift(message);
+    queueMessages()
+            .catch((err) => {if (err) throw err;});
+}
+
+// I realize how jank this is, but it works for what I need. Runs every 5 seconds
+const timedQueue = () => {
+    try {
+        let timedMessage = fs.readFileSync('./timedqueue.json');
+        fs.writeFile('./timedqueue.json', JSON.stringify('{}'), (err) => {if (err) throw err});
+        timedMessage = JSON.parse(timedMessage);
+        if (timedMessage == "{}" || isEmpty(timedMessage)) return;
+        console.log("Found a message");
+        let timeToDisplay = Date.parse(timedMessage.timeToDisplay);
+        let timeWhen = timeToDisplay - Date.now();
+        timedMessageQueue.push(setTimeout(() => {placeIntoQueue(timedMessage)}, timeWhen));
+    } catch {
+        console.error(err)
+    }
+    
 }
 
 start();
-// setTimeout(() => {
-//     currentSavings = false;
-//     getSavings();
-// }, 10000);
+
+let timedQueueInterval = setInterval(timedQueue, 5000);
 
 router.get('/', (req, res) => {
     res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
