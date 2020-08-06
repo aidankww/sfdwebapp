@@ -66,6 +66,7 @@ router.post('/', (req, res, next ) => {
                             messageResult += codeArray[i];
                             messageResult += ' ';
                         }
+                        messageResult = messageResult.substring(0, messageResult.length-1);
                         messageObject.message= messageResult;
                         message = messageResult;
                         messageObject.time = parseInt(codeArray[index+1], 10);
@@ -142,7 +143,7 @@ const queueMessages = () => {
 const prepMessage = () => {
     console.log('Message in queue, processing...');
     currentMessage = messageQueue.shift();
-    console.log(currentMessage.message);
+    console.log("Current Message: " + currentMessage.message);
     let message = currentMessage.message;
     let convertedMessage = translate(message);
     sendSerial(convertedMessage)
@@ -188,7 +189,7 @@ const getSavings = () => {
             });
 
             res.on('end', () => {
-                result = `$${JSON.parse(amount)}`;
+                result = JSON.parse(amount);
                 if (result != currentSavingsAmount || !currentSavings) {
                     currentSavingsAmount = result;
                     postCurrentSavings();
@@ -220,23 +221,39 @@ const getSavings = () => {
 const postCurrentSavings = () => {
     if (messageQueue.length == 0) {
         currentSavings = true;
-        let translatedMessage = translate(currentSavingsAmount); // Could be optimized storing the translated message
+        let translatedMessage = currentSavingsAmount;
+        translatedMessage = numberWithCommas(translatedMessage);
+        translatedMessage = `$${translatedMessage}`;
+        while (translatedMessage.length < 15) {
+            translatedMessage = "=" + translatedMessage;
+        }
+        translatedMessage = translate(translatedMessage);
         sendSerial(translatedMessage)
             .catch(rej => console.log(rej));
     }
 }
 
+function numberWithCommas(x) {
+    return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+}
+
 // Translates message to "motor language" and returns it as a string
 const translate = (message) => {
+    let validInput = true;
     message = message.toString();
-    while (message.length < 15) { // This may no longer be necessary. I'll have to test when I get back to the office.
-        message = message.concat('=');
+    while (message.length < 15) {
+        message = message + '=';
     }
 
     slicedMessage = message.slice(0, 15).toLowerCase();
-    posConvertedMessage = '';
+    let posConvertedMessage = '';
     for (i = 0; i < slicedMessage.length; i++) {
-        posConvertedMessage = posConvertedMessage.concat(pos[slicedMessage[i]]);
+        let convertedChar = pos[slicedMessage[i]];
+        if (typeof(convertedChar) !== "undefined") {
+            posConvertedMessage = posConvertedMessage.concat(pos[slicedMessage[i]]);
+        } else {
+            posConvertedMessage = posConvertedMessage + "52";
+        }
     }
     posConvertedMessage = posConvertedMessage.concat('z');
 
@@ -260,7 +277,9 @@ const translate = (message) => {
 }
 
 const start = () => {
-    let test = translate(" 0000000000");
+    let test = translate("000000000000000");
+    setTimeout(() => getSavings(), 10000);
+    currentSavings = false;
     sendSerial(test);
     // fs.writeFile('./timedqueue.json', JSON.stringify('{}'), (err) => {if (err) throw err});
     timedQueue();
@@ -291,7 +310,7 @@ const timedQueue = () => {
         let timeToDisplay = Date.parse(timedMessage.timeToDisplay);
         let timeWhen = timeToDisplay - Date.now();
         timedMessageQueue.push(setTimeout(() => {placeIntoQueue(timedMessage)}, timeWhen));
-    } catch {
+    } catch (err) {
         console.error(err)
     }
     
