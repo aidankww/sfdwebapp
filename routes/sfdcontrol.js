@@ -59,6 +59,11 @@ router.post('/', (req, res, next ) => {
 
     let codeArray = message.split(' ');
 
+    if (message == null || author == null) {
+        res.send("Invalid input", 400);
+        return;
+    }
+
     // Message time override (only works if user has permission) TODO: This could probably use some optimization
     try {
         codeArray.forEach((element, index) => {
@@ -98,7 +103,6 @@ router.post('/', (req, res, next ) => {
 });
 
 router.post('/direct', (req, res) => {
-    // Need to restrict time somehow
     let message = req.body.message;
     let time = req.body.time;
     let author = req.body.author;
@@ -157,7 +161,7 @@ const prepMessage = () => {
     let message = currentMessage.message;
     let convertedMessage = translate(message);
     sendSerial(convertedMessage)
-            .catch(rej => console.log(rej));
+            // .catch(rej => console.log(rej));
 };
 
 // Sends a serial message via RPi GPIO. [ADD ASSIGNED PORTS HERE]
