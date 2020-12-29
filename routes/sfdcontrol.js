@@ -9,6 +9,8 @@ const signVerification = require('../signVerification.js');
 const http = require('https');
 const Gpio = require('onoff').Gpio;
 
+// To work on desktop, no calls can be made to serial. Instead, print out results
+
 const serialToggle = new Gpio(4, 'out');
 serialToggle.writeSync(1);
 
@@ -29,6 +31,14 @@ pos = {
     '-':48, '%':49, '*':50, '#':51, '=':52, '_': 52
 };
 
+class messageObject {
+    constructor(author, message, time) {
+        this.author = author;
+        this.message = message;
+        this.time = time;
+    }
+}
+
 router.post('/', signVerification);
 
 let messageQueue = [];
@@ -45,11 +55,7 @@ router.post('/', (req, res, next ) => {
 
     var message = req.body.text;
     var author = req.body.user_name;
-    let messageObject = {
-        author: author,
-        message: message,
-        time: 60
-    };
+    let object = new messageObject(author, message, 60)
 
     let codeArray = message.split(' ');
 
@@ -59,17 +65,17 @@ router.post('/', (req, res, next ) => {
             if (element === "`override") {
                 let isAdmin = false;
                 privilegedUsers.forEach(user => {
-                    if (user === messageObject.author) {
-                        console.log(`Time override by ${messageObject.author}`);
+                    if (user === object.author) {
+                        console.log(`Time override by ${object.author}`);
                         let messageResult = "";
                         for (var i = 0; i < index; i++) {
                             messageResult += codeArray[i];
                             messageResult += ' ';
                         }
                         messageResult = messageResult.substring(0, messageResult.length-1);
-                        messageObject.message= messageResult;
+                        object.message= messageResult;
                         message = messageResult;
-                        messageObject.time = parseInt(codeArray[index+1], 10);
+                        object.time = parseInt(codeArray[index+1], 10);
                         isAdmin = true;
                     }
                 });
@@ -83,36 +89,40 @@ router.post('/', (req, res, next ) => {
         console.log(err);
     }
 
-    // We only have a max of 15 boxes
-    // if (message.length() > 15) {
-    //     res.send('Cannot have more than 15 characters' || 400);
-    // }
-
-    // Prep log tracking
-    let date = new Date;
-    let time = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ` + `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
-    
-    var log = time + " | " +  author + ": " + message + "\n";
-    
-    fs.appendFile('./log.txt', log, (err) => {
-        if (err) {
-            console.log(err);
-            return;
-        }
-    });
+    log(message, author);
 
     res.send(`Message "${message}" queued for the Split Flap Display! It will display in ${messageQueue.length} minute(s).`);
 
-    messageQueue.push(messageObject);
+    pushToQueue(object);
     
+});
+
+router.post('/direct', (req, res) => {
+    // Need to restrict time somehow
+    let message = req.body.message;
+    let time = req.body.time;
+    let author = req.body.author;
+
+    let directObject = new messageObject(author, message, time);
+    if (time > 60) {
+        res.send("Times over 60 seconds are restricted to slack requests.")
+    } else {
+        log(message, author);
+        res.send(`Message "${message}" queued for the Split Flap Display! It will display in ${messageQueue.length} minute(s).`);
+    
+        pushToQueue(directObject);
+    }
+    
+});
+
+const pushToQueue = (msgObj) => {
+    messageQueue.push(msgObj);
     if (currentSavings) {
         queueMessages()
                 .catch(rej => console.error(rej));
     }
-    // As we're using a provided message, we tell the system that we are not using a savings value
     currentSavings = false;
-    
-});
+} 
 
 const queueMessages = () => {
     return new Promise((resolve, reject) => {
@@ -166,7 +176,7 @@ const sendSerial = (message) => {
         
         resolve();
     });
-    
+    console.log(message);
 }
 
 // Grabs the company's reported client savings 
@@ -299,7 +309,7 @@ const placeIntoQueue = (message) => {
             .catch((err) => {if (err) throw err;});
 }
 
-// I realize how jank this is, but it works for what I need. Runs every 5 seconds
+// This needs to be completely redone with HTTP from a form instead of this garbage
 const timedQueue = () => {
     try {
         let timedMessage = fs.readFileSync('./timedqueue.json');
@@ -319,6 +329,20 @@ const timedQueue = () => {
 start();
 
 let timedQueueInterval = setInterval(timedQueue, 5000);
+
+const log = (message, author) => {
+    let date = new Date;
+    let time = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ` + `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+    
+    var log = time + " | " +  author + ": " + message + "\n";
+    
+    fs.appendFile('./log.txt', log, (err) => {
+        if (err) {
+            console.log(err);
+            return;
+        }
+    });
+}
 
 router.get('/', (req, res) => {
     res.render('sfdcontrol', {title:'Split Flap Message Queue HQN', table: messageQueue});
