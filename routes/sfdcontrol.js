@@ -1,22 +1,21 @@
-// TODO: If the current message is the same as the previous, don't send a serial message (Don't do until development is complete)
 // TODO: Bugfix - after a while, savings will run and make any orders useless. Gets stuck on that number, needs program restart
 
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
-const serialport = require('serialport');
+// const serialport = require('serialport');
 const signVerification = require('../signVerification.js');
 const http = require('https');
-const Gpio = require('onoff').Gpio;
+// const Gpio = require('onoff').Gpio;
 
 // To work on desktop, no calls can be made to serial. Instead, print out results
 
-const serialToggle = new Gpio(4, 'out');
-serialToggle.writeSync(1);
+// const serialToggle = new Gpio(4, 'out');
+// serialToggle.writeSync(1);
 
-const port = new serialport('/dev/serial0', {
-    baudRate:9600
-});
+// const port = new serialport('/dev/serial0', {
+//     baudRate:9600
+// });
 
 const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman'];
 
@@ -56,7 +55,7 @@ router.post('/', (req, res, next ) => {
     var message = req.body.text;
     var author = req.body.user_name;
     if (message == null || author == null) {
-        res.send("Invalid input", 400);
+        res.status(400).send("Invalid input");
         return;
     }
     let object = new messageObject(author, message, 60)
@@ -120,6 +119,10 @@ router.post('/direct', (req, res) => {
 });
 
 router.post('/directControl', (req, res) => {
+    if (req.ip != "192.24.166.166" || req.ip != "74.132.244.173") { // Can only come from a local network
+        res.status(403).send("No Permission");
+        return;
+    }
     var message = req.body.text;
     var author = req.body.author;
     var time = req.body.time;
@@ -127,9 +130,7 @@ router.post('/directControl', (req, res) => {
         res.status(400).send("Invalid input");
         return;
     }
-    if (req.ip != "192.24.166.166" || req.ip != "74.132.244.173") { // Can only come from a local network
-        res.status(403).send("No Permission");
-    }
+    let object = new messageObject(author, message, time);
     
     log(message, author);
 
@@ -139,9 +140,46 @@ router.post('/directControl', (req, res) => {
     
 });
 
-// router.post('/timed', (req, res) => {
+router.post('/timed', (req, res) => {
+    var message = req.body.text;
+    var author = req.body.author;
+    if (message == null || key == null || time == null) {
+        res.status(400).send("Invalid input");
+        return;
+    }
+    let isAdmin = false;
+    privilegedUsers.forEach(user => {
+        if (user == author) {
+            isAdmin = true;
+        }
+    });
+    if (!isAdmin) {
+        res.send("You do not have permission to use this command");
+        return;
+    }
 
-// });
+    let tempQueue = [];
+    let messages = message.split("||");
+    messages.forEach(newMessage => {
+        let messageSplit = newMessage.split(" ");
+        let time = messageSplit[0];
+        let messageResult = "";
+        for (i = 1; i < messageSplit.length; i++) {
+            messageResult += messageSplit[i];
+            if (i != messageSplit.length - 1) {
+                messageResult += " ";
+            }
+        }
+        let timedMessage = new messageObject(author, messageResult, time);
+        tempQueue.push(timedMessage);
+    });
+    tempQueue.forEach(msgObject => {
+        messageQueue.unshift(msgObject);
+    });
+    let currentMsgObj = new messageObject("Interrupted", currentMessage, 60);
+    messageQueue.splice(tempQueue.length, 0, currentMsgObj);
+    queueMessages();
+});
 
 const pushToQueue = (msgObj) => {
     messageQueue.push(msgObj);
@@ -160,10 +198,10 @@ const queueMessages = () => {
             getSavings();
         // When there is a message, the message will be translated into "motor language" for the microcontrollers.
         } else if (messageQueue.length > 0) {
-            prepMessage();
             timeouts.forEach((object) => {
                 clearTimeout(object);
             });
+            prepMessage();
             resolve();
         } else if (currentSavings) {
             timeouts.push(setTimeout(() => {
@@ -190,20 +228,20 @@ const prepMessage = () => {
 
 // Sends a serial message via RPi GPIO. [ADD ASSIGNED PORTS HERE]
 const sendSerial = (message) => {
-    return new Promise((resolve, reject) => {
-        port.write(message, (err) => {
-            if (err) {
-                reject(err);
-            }
-            else
-            {
-                console.log(`Serial message "${message}" sent!`)
-                resolve();
-            }
-        });
+    // return new Promise((resolve, reject) => {
+    //     port.write(message, (err) => {
+    //         if (err) {
+    //             reject(err);
+    //         }
+    //         else
+    //         {
+    //             console.log(`Serial message "${message}" sent!`)
+    //             resolve();
+    //         }
+    //     });
         
-        resolve();
-    });
+    //     resolve();
+    // });
     console.log(message);
 }
 
@@ -267,7 +305,7 @@ const postCurrentSavings = () => {
         }
         translatedMessage = translate(translatedMessage);
         sendSerial(translatedMessage)
-            .catch(rej => console.log(rej));
+            // .catch(rej => console.log(rej));
     }
 }
 
@@ -319,8 +357,6 @@ const start = () => {
     setTimeout(() => getSavings(), 10000);
     currentSavings = false;
     sendSerial(test);
-    // fs.writeFile('./timedqueue.json', JSON.stringify('{}'), (err) => {if (err) throw err});
-    timedQueue();
 }
 
 const isEmpty = (obj) => {
@@ -337,26 +373,7 @@ const placeIntoQueue = (message) => {
             .catch((err) => {if (err) throw err;});
 }
 
-// This needs to be completely redone with HTTP from a form instead of this garbage
-const timedQueue = () => {
-    try {
-        let timedMessage = fs.readFileSync('./timedqueue.json');
-        fs.writeFile('./timedqueue.json', JSON.stringify('{}'), (err) => {if (err) throw err});
-        timedMessage = JSON.parse(timedMessage);
-        if (timedMessage == "{}" || isEmpty(timedMessage)) return;
-        console.log("Found a message");
-        let timeToDisplay = Date.parse(timedMessage.timeToDisplay);
-        let timeWhen = timeToDisplay - Date.now();
-        timedMessageQueue.push(setTimeout(() => {placeIntoQueue(timedMessage)}, timeWhen));
-    } catch (err) {
-        console.error(err)
-    }
-    
-}
-
 start();
-
-let timedQueueInterval = setInterval(timedQueue, 5000);
 
 const log = (message, author) => {
     let date = new Date;

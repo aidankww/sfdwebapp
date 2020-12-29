@@ -8,7 +8,6 @@ const port = 5000;
 
 var indexRouter = require('./routes/index');
 var sfdRouter = require('./routes/sfdcontrol');
-var sfdTimedRouter = require('./routes/sfdtimed');
 var directRouter = require('./routes/direct');
 
 var app = express();
@@ -28,7 +27,6 @@ app.use(bodyParser.json());
 
 app.use('/', indexRouter);
 app.use('/sfdcontrol', sfdRouter);
-app.use('/sfdtimed', sfdTimedRouter);
 app.use('/directControl', directRouter);
 
 // catch 404 and forward to error handler
