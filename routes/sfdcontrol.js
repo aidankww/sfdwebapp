@@ -55,14 +55,14 @@ router.post('/', (req, res, next ) => {
 
     var message = req.body.text;
     var author = req.body.user_name;
-    let object = new messageObject(author, message, 60)
-
-    let codeArray = message.split(' ');
-
     if (message == null || author == null) {
         res.send("Invalid input", 400);
         return;
     }
+    let object = new messageObject(author, message, 60)
+
+    let codeArray = message.split(' ');
+
 
     // Message time override (only works if user has permission) TODO: This could probably use some optimization
     try {
@@ -118,6 +118,30 @@ router.post('/direct', (req, res) => {
     }
     
 });
+
+router.post('/directControl', (req, res) => {
+    var message = req.body.text;
+    var author = req.body.author;
+    var time = req.body.time;
+    if (message == null || key == null || time == null) {
+        res.status(400).send("Invalid input");
+        return;
+    }
+    if (req.ip != "192.24.166.166" || req.ip != "74.132.244.173") { // Can only come from a local network
+        res.status(403).send("No Permission");
+    }
+    
+    log(message, author);
+
+    res.status(200);
+
+    pushToQueue(object);
+    
+});
+
+// router.post('/timed', (req, res) => {
+
+// });
 
 const pushToQueue = (msgObj) => {
     messageQueue.push(msgObj);
