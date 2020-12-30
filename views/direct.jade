@@ -1,0 +1,16 @@
+extends layout
+block content
+    h1 Waites Split Flap Display Control
+
+    form(action="/sfdcontrol/direct", name="Control", method="POST")
+        div.input
+            span.label Message 
+            input(type="text", name="message", required)
+        div.input
+            span.label Time 
+            input(type="number", name="time", required, value=60)
+        div.input
+            span.label Author 
+            input(type="text", name="author", required, value="Direct")
+        div.actions
+            input(type="submit", name="Submit Message")
