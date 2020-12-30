@@ -248,7 +248,7 @@ const sendSerial = (message) => {
         
         resolve();
     });
-    console.log(message);
+
 }
 
 // Grabs the company's reported client savings 
