@@ -17,7 +17,7 @@ const http = require('https');
 //     baudRate:9600
 // });
 
-const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman'];
+const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman', 'aidank'];
 
 pos = new Object();
 pos = {
@@ -126,7 +126,7 @@ router.post('/directControl', (req, res) => {
     var message = req.body.text;
     var author = req.body.author;
     var time = req.body.time;
-    if (message == null || key == null || time == null) {
+    if (message == null || author == null || time == null) {
         res.status(400).send("Invalid input");
         return;
     }
@@ -142,8 +142,8 @@ router.post('/directControl', (req, res) => {
 
 router.post('/timed', (req, res) => {
     var message = req.body.text;
-    var author = req.body.author;
-    if (message == null || key == null || time == null) {
+    var author = req.body.user_name;
+    if (message == null || author == null) {
         res.status(400).send("Invalid input");
         return;
     }
@@ -173,9 +173,12 @@ router.post('/timed', (req, res) => {
         let timedMessage = new messageObject(author, messageResult, time);
         tempQueue.push(timedMessage);
     });
+
     tempQueue.forEach(msgObject => {
         messageQueue.unshift(msgObject);
     });
+    
+    res.send("Timed messages will be displayed immediately")
     let currentMsgObj = new messageObject("Interrupted", currentMessage, 60);
     messageQueue.splice(tempQueue.length, 0, currentMsgObj);
     queueMessages();
@@ -357,20 +360,6 @@ const start = () => {
     setTimeout(() => getSavings(), 10000);
     currentSavings = false;
     sendSerial(test);
-}
-
-const isEmpty = (obj) => {
-    for(var key in obj) {
-        if(obj.hasOwnProperty(key))
-            return false;
-    }
-    return true;
-}
-
-const placeIntoQueue = (message) => {
-    messageQueue.unshift(message);
-    queueMessages()
-            .catch((err) => {if (err) throw err;});
 }
 
 start();
