@@ -6,7 +6,7 @@ var fs = require('fs');
 const serialport = require('serialport');
 const signVerification = require('../signVerification.js');
 const http = require('https');
-// const Gpio = require('onoff').Gpio;
+const Gpio = require('onoff').Gpio;
 
 // To work on desktop, no calls can be made to serial. Instead, print out results
 
@@ -17,7 +17,7 @@ const port = new serialport('/dev/serial0', {
     baudRate:9600
 });
 
-const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman', 'aidank'];
+const privilegedUsers = ['UFV3RAM1R', 'U1303KW5Q'];
 
 pos = new Object();
 pos = {
@@ -68,7 +68,7 @@ router.post('/', (req, res, next ) => {
             if (element === "`override") {
                 let isAdmin = false;
                 privilegedUsers.forEach(user => {
-                    if (user === object.author) {
+                    if (user === req.body.user_id) {
                         console.log(`Time override by ${object.author}`);
                         let messageResult = "";
                         for (var i = 0; i < index; i++) {
@@ -150,7 +150,7 @@ router.post('/timed', (req, res) => {
     }
     let isAdmin = false;
     privilegedUsers.forEach(user => {
-        if (user == author) {
+        if (user == req.body.user_id) {
             isAdmin = true;
         }
     });
@@ -248,6 +248,7 @@ const sendSerial = (message) => {
         
         resolve();
     });
+    console.log(message);
 }
 
 // Grabs the company's reported client savings 

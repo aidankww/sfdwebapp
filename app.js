@@ -4,7 +4,7 @@ var path = require('path');
 var logger = require('morgan');
 var bodyParser = require('body-parser');
 var fs = require('fs');
-const port = 5000;
+const port = 5001;
 
 var indexRouter = require('./routes/index');
 var sfdRouter = require('./routes/sfdcontrol');
