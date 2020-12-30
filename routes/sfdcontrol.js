@@ -3,19 +3,19 @@
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
-// const serialport = require('serialport');
+const serialport = require('serialport');
 const signVerification = require('../signVerification.js');
 const http = require('https');
 // const Gpio = require('onoff').Gpio;
 
 // To work on desktop, no calls can be made to serial. Instead, print out results
 
-// const serialToggle = new Gpio(4, 'out');
-// serialToggle.writeSync(1);
+const serialToggle = new Gpio(4, 'out');
+serialToggle.writeSync(1);
 
-// const port = new serialport('/dev/serial0', {
-//     baudRate:9600
-// });
+const port = new serialport('/dev/serial0', {
+    baudRate:9600
+});
 
 const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic', 'Rob Ratterman', 'aidank'];
 
@@ -234,21 +234,20 @@ const prepMessage = () => {
 
 // Sends a serial message via RPi GPIO. [ADD ASSIGNED PORTS HERE]
 const sendSerial = (message) => {
-    // return new Promise((resolve, reject) => {
-    //     port.write(message, (err) => {
-    //         if (err) {
-    //             reject(err);
-    //         }
-    //         else
-    //         {
-    //             console.log(`Serial message "${message}" sent!`)
-    //             resolve();
-    //         }
-    //     });
+    return new Promise((resolve, reject) => {
+        port.write(message, (err) => {
+            if (err) {
+                reject(err);
+            }
+            else
+            {
+                console.log(`Serial message "${message}" sent!`)
+                resolve();
+            }
+        });
         
-    //     resolve();
-    // });
-    console.log(message);
+        resolve();
+    });
 }
 
 // Grabs the company's reported client savings 
