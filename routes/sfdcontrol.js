@@ -21,12 +21,12 @@ const privilegedUsers = ['Aidan Kovacic', 'rob', 'Jeff Schinaman', 'aidankovacic
 
 pos = new Object();
 pos = {
-    ' ':52, 'a':53, 'b':54, 'c':55, 'd':56, 'e':57, 'f':58, 'g':59, 
-    'h':60, 'i':61, 'j':10, 'k':11, 'l':12, 'm':13, 'n':14, 'o':15, 
-    'p':16, 'q':17, 'r':18, 's':19, 't':20, 'u':21, 'v':22, 'w':23, 
-    'x':24, 'y':25, 'z':26, '0':27, '1':28, '2':29, '3':30, '4':31, 
-    '5':32, '6':33, '7':34, '8':35, '9':36, ',':37, '.':38, '!':39, 
-    '?':40, ':':41, '/':42, "'":43, '@':44, '$':45, '&':46, '+':47, 
+    ' ':52, 'a':53, 'b':54, 'c':55, 'd':56, 'e':57, 'f':58, 'g':59,
+    'h':60, 'i':61, 'j':10, 'k':11, 'l':12, 'm':13, 'n':14, 'o':15,
+    'p':16, 'q':17, 'r':18, 's':19, 't':20, 'u':21, 'v':22, 'w':23,
+    'x':24, 'y':25, 'z':26, '0':27, '1':28, '2':29, '3':30, '4':31,
+    '5':32, '6':33, '7':34, '8':35, '9':36, ',':37, '.':38, '!':39,
+    '?':40, ':':41, '/':42, "'":43, '@':44, '$':45, '&':46, '+':47,
     '-':48, '%':49, '*':50, '#':51, '=':52, '_': 52
 };
 
@@ -45,7 +45,6 @@ let previousMessage = '';
 let currentMessage = '';
 let currentSavingsAmount = '';
 let timeouts = [];
-let timedMessageQueue = [];
 
 // Used to determine whether the current message is savings
 let currentSavings = true;
@@ -98,7 +97,7 @@ router.post('/', (req, res, next ) => {
     res.send(`Message "${message}" queued for the Split Flap Display! It will display in ${messageQueue.length} minute(s).`);
 
     pushToQueue(object);
-    
+
 });
 
 router.post('/direct', (req, res) => {
@@ -112,10 +111,10 @@ router.post('/direct', (req, res) => {
     } else {
         log(message, author);
         res.send(`Message "${message}" queued for the Split Flap Display! It will display in ${messageQueue.length} minute(s).`);
-    
+
         pushToQueue(directObject);
     }
-    
+
 });
 
 router.post('/directControl', (req, res) => {
@@ -140,6 +139,8 @@ router.post('/directControl', (req, res) => {
     
 });
 
+router.post('/timed', signVerification);
+
 router.post('/timed', (req, res) => {
     var message = req.body.text;
     var author = req.body.user_name;
@@ -162,6 +163,9 @@ router.post('/timed', (req, res) => {
     let messages = message.split("||");
     messages.forEach(newMessage => {
         let messageSplit = newMessage.split(" ");
+        messageSplit = messageSplit.filter((ele) => {
+            return ele != "";
+        });
         let time = messageSplit[0];
         let messageResult = "";
         for (i = 1; i < messageSplit.length; i++) {
@@ -171,16 +175,15 @@ router.post('/timed', (req, res) => {
             }
         }
         let timedMessage = new messageObject(author, messageResult, time);
-        tempQueue.push(timedMessage);
+        tempQueue.unshift(timedMessage);
     });
 
     tempQueue.forEach(msgObject => {
         messageQueue.unshift(msgObject);
     });
-    
+
     res.send("Timed messages will be displayed immediately")
-    let currentMsgObj = new messageObject("Interrupted", currentMessage, 60);
-    messageQueue.splice(tempQueue.length, 0, currentMsgObj);
+    
     queueMessages();
 });
 
